@@ -66,7 +66,7 @@ class TelegramSender:
     async def run(
         self,
         chat_ids: list[int],
-        text: str = "",
+        text: str | None = "",
         media_items: list[MediaItem] | None = None,
         reply_markup: dict | None = None,
         disable_web_page_preview: bool = False,
@@ -85,6 +85,9 @@ class TelegramSender:
         else:
             self._method = "sendMessage"
 
+        if self._method == "sendMessage" and not text:
+            raise ValueError("text is required when sending a text-only message")
+
         self._url = self._url_template.format(token=self._token, method=self._method)
         data = self._prepare_data(
             text, media_items, reply_markup, disable_web_page_preview
@@ -99,12 +102,14 @@ class TelegramSender:
 
     def _prepare_data(
         self,
-        text: str,
+        text: str | None,
         media_items: list[MediaItem],
         reply_markup: dict | None,
         disable_web_page_preview: bool,
     ) -> dict[str, Any]:
         """Prepares data for sending based on the method."""
+        text = "" if text is None else text
+
         if self._method == "sendMediaGroup":
             media_group = []
             for index, item in enumerate(media_items):
