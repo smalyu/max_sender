@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "telegram_sender"
-version = "1.6.0"
+version = "1.6.1"
 description = 'Asynchronous Python tool for efficiently sending messages and photos to multiple Telegram users with optional MongoDB logging.'
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -21,13 +21,20 @@ dependencies = [
 ]
 
 classifiers = [
+    "Typing :: Typed",
     "Intended Audience :: Developers",
     "Framework :: AsyncIO",
-    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.urls]
