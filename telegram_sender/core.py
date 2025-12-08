@@ -113,7 +113,7 @@ class TelegramSender:
         if self._method == "sendMediaGroup":
             media_group = []
             for index, item in enumerate(media_items):
-                media_dict = item.dict()
+                media_dict = item.model_dump()
                 if index == 0:
                     media_dict["caption"] = text
                     media_dict["parse_mode"] = self._parse_mode
