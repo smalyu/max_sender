@@ -41,6 +41,7 @@ classifiers = [
 "Homepage" = "https://github.com/smalyu/max_sender"
 "Bug Tracker" = "https://github.com/smalyu/max_sender/issues"
 "Source" = "https://github.com/smalyu/max_sender"
+"PyPI" = "https://pypi.org/project/max_sender/"
 
 [tool.setuptools.packages.find]
 include = ["max_sender*"]

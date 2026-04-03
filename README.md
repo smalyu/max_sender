@@ -22,6 +22,7 @@
 
 ```bash
 pip install max_sender
+uv add max_sender
 ```
 
 Python 3.10+ is required.
@@ -137,6 +138,27 @@ When `use_mongo=True`, each attempt is stored in a collection named by the Mosco
 - raw MAX response body
 - exception details, if any
 - compact payload summary
+
+## Releasing To PyPI
+
+Publishing is automated by [`.github/workflows/python-publish.yml`](.github/workflows/python-publish.yml).
+
+1. Bump `version` in [`pyproject.toml`](pyproject.toml).
+2. Push the version bump to `master`.
+3. Create a GitHub Release.
+4. The workflow builds `sdist` and `wheel`, runs `twine check`, and publishes the release artifacts to PyPI.
+
+Authentication options:
+
+- If the repository secret `PYPI_API_TOKEN` is configured, the workflow publishes with that token.
+- If `PYPI_API_TOKEN` is not configured, the workflow falls back to PyPI trusted publishing.
+
+PyPI trusted publisher settings for this repository:
+
+- PyPI project: `max_sender`
+- GitHub owner/repo: `smalyu/max_sender`
+- Workflow file: `.github/workflows/python-publish.yml`
+- GitHub environment: `pypi`
 
 ## Notes
 
