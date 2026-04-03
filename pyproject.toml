@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "telegram_sender"
-version = "1.6.1"
-description = 'Asynchronous Python tool for efficiently sending messages and photos to multiple Telegram users with optional MongoDB logging.'
+name = "max_sender"
+version = "0.1.0"
+description = "Asynchronous Python tool for efficiently sending MAX messages, media, and inline keyboards with optional MongoDB logging."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
-keywords = ["telegram", "bot", "async", "message", "sender"]
+keywords = ["max", "messenger", "bot", "async", "message", "sender"]
 
 authors = [
   { name="Alexander Smirnov", email="Alex@TheSmirnov.com" },
@@ -38,6 +38,9 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/smalyu/telegram_sender"
-"Bug Tracker" = "https://github.com/smalyu/telegram_sender/issues"
-"Source" = "https://github.com/smalyu/telegram_sender"
+"Homepage" = "https://github.com/smalyu/max_sender"
+"Bug Tracker" = "https://github.com/smalyu/max_sender/issues"
+"Source" = "https://github.com/smalyu/max_sender"
+
+[tool.setuptools.packages.find]
+include = ["max_sender*"]

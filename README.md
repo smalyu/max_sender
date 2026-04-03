@@ -1,345 +1,156 @@
-# telegram_sender: Asynchronous Telegram Message Sender
+# max_sender: Asynchronous MAX Broadcast Sender
 
-**telegram_sender** is an asynchronous Python package designed to send messages, photos, and videos (single or multiple, in any order) to multiple Telegram users efficiently. It leverages Python's `asyncio` and `aiohttp` libraries to handle concurrent HTTP requests, making it suitable for broadcasting messages to a large number of users with optimal performance.
+`max_sender` is an asynchronous Python package for bulk delivery through the MAX bot API. It keeps the original workflow intact where it matters: one async sender instance, batched delivery, retry handling for temporary failures, optional MongoDB logging, and support for text, media, and inline keyboards.
 
-## Table of Contents
+## Features
 
-- [Overview](#overview)
-- [Installation](#installation)
-- [How It Works](#how-it-works)
-- [Advantages](#advantages)
-- [Usage Examples](#usage-examples)
-  - [Example 1 - Simple Text Message Broadcast](#example-1---simple-text-message-broadcast)
-  - [Example 2 - Sending a Single Photo with Text and Buttons](#example-2---sending-a-single-photo-with-text-and-buttons)
-  - [Example 3 - Sending Multiple Photos and Videos in Any Order](#example-3---sending-multiple-photos-and-videos-in-any-order)
-  - [Example 4 - Sending a Single Video with Text and Buttons](#example-4---sending-a-single-video-with-text-and-buttons)
-  - [Example 5 - Logging Messages in MongoDB](#example-5---logging-messages-in-mongodb)
-  - [Example 6 - Disabling Web Page Preview](#example-6---disabling-web-page-preview)
-- [Getting Started](#getting-started)
-- [How to Obtain Media File IDs](#how-to-obtain-media-file-ids)
-
-## Overview
-
-In modern applications, especially those involving notifications or updates, sending messages to a multitude of users is a common requirement. **telegram_sender** addresses this need by providing an asynchronous solution that sends messages in batches, handles errors gracefully, and optionally logs the results to MongoDB for record-keeping or analysis.
+- Async batch delivery over `aiohttp`
+- One `run(...)` call for text, media, or media plus inline keyboard
+- Explicit `recipient_type="user"` or `recipient_type="chat"`
+- Internal pacing guard that keeps delivery on the MAX-safe profile even if higher batch values are requested
+- Automatic retry for temporary MAX failures:
+  - HTTP `429`
+  - HTTP `503`
+  - network exceptions
+  - MAX error code `attachment.not.ready`
+- Sender-level pause and retry queue: temporary failures pause the whole broadcast, retry the affected messages, and only then continue with later batches
+- When MAX answers `429` without a `Retry-After`, the sender falls back to a longer rate-limit cooldown instead of the generic short retry interval
+- Optional MongoDB logging for every send attempt
+- MAX-compatible `HTML` and `Markdown` formatting
 
 ## Installation
 
-You can install **telegram_sender** directly from PyPI:
-
 ```bash
-pip install telegram_sender
+pip install max_sender
 ```
 
-Make sure you have Python 3.10 or higher installed.
+Python 3.10+ is required.
 
-## How It Works
+## MAX API mapping
 
-**telegram_sender** operates by:
+- Text and media are sent through `POST /messages`
+- Recipients are addressed with either `user_id` or `chat_id`
+- Media helpers `Photo(...)` and `Video(...)` expect ready-to-use MAX media tokens
+- `reply_markup.inline_keyboard` is converted into a MAX `inline_keyboard` attachment
 
-1. **Preparing Message Data**: It formats the message content, including text, photos, and videos (single or multiple, in any order), and optional reply markups, in a way that is compatible with the Telegram Bot API. You can also specify the `parse_mode` (e.g., `HTML`, `Markdown`) when initializing the class to control how text is parsed by Telegram.
+## Quick Start
 
-2. **Batching Requests**: To avoid exceeding Telegram's rate limits and to improve performance, it divides the list of recipient chat IDs into batches. Each batch contains a specified number of messages (`batch_size`).
-
-3. **Asynchronous Sending**: Using asynchronous HTTP requests, it sends each batch concurrently, ensuring that the program doesn't block while waiting for responses.
-
-4. **Delay Between Batches**: After sending a batch, it waits for a specified delay (`delay_between_batches`) before sending the next one. This delay helps comply with Telegram's rate limits and prevents server overload.
-
-5. **Error Handling**: If a message fails to send, the error is logged using Python's `logging` module. The process continues with the next messages without interruption. **If the error code is `429 Too Many Requests`, the library automatically pauses for the required `retry_after` interval and re-sends those messages exactly once.**
-
-6. **MongoDB Logging (Optional)**: If enabled, the results of each message send operation are stored in a MongoDB collection. This feature is useful for auditing, analytics, or retry mechanisms.
-
-## Advantages
-
-- **Asynchronous Processing**: Utilizes `asyncio` and `aiohttp` for non-blocking operations, making it efficient for high-volume message sending.
-- **Batch Management**: Sends messages in configurable batches to optimize performance and comply with rate limits.
-- **Error Resilience**: Continues sending messages even if some fail, and logs errors for later review. **For `429 Too Many Requests`, it automatically re-sends after the required pause.**
-- **Configurable**: Offers flexibility through parameters such as batch size, delay intervals, parse mode, and MongoDB settings.
-- **Optional Logging**: Allows enabling or disabling MongoDB logging based on your needs.
-
-## Usage Examples
-
-### Example 1 - Simple Text Message Broadcast
-
-This example demonstrates how to send a simple text message to multiple users.
+### Text broadcast
 
 ```python
 import asyncio
-from telegram_sender import TelegramSender
 
-async def main():
-    # Initialize the message sender
-    sender = TelegramSender(
-        token="YOUR_TELEGRAM_BOT_TOKEN",
-        batch_size=30,  # Increased batch size to 30 messages concurrently
-        delay_between_batches=1.5,  # 1.5-second delay between batches
-        use_mongo=False,  # No MongoDB logging
-        parse_mode="Markdown"  # Setting parse_mode to Markdown
+from max_sender import MaxSender
+
+
+async def main() -> None:
+    sender = MaxSender(
+        token="YOUR_MAX_BOT_TOKEN",
+        batch_size=25,
+        delay_between_batches=1.1,
+        use_mongo=False,
+        parse_mode="HTML",
     )
 
-    # Message text
-    text = "*Hello!* This is a test message."
-
-    # List of chat IDs
-    chat_ids = [123456789, 987654321, 456123789]
-
-    # Start the message sending process
-    delivered, not_delivered = await sender.run(chat_ids, text=text)
-
-    # Output statistics
-    print(f"Successfully sent: {delivered}, Failed to send: {not_delivered}")
-
-# Run the asynchronous task
-asyncio.run(main())
-```
-
-### Example 2 - Sending a Single Photo with Text and Buttons
-
-This example shows how to send a single photo with a caption and inline buttons.
-
-```python
-import asyncio
-from telegram_sender import TelegramSender, Photo
-
-async def main():
-    # Initialize the message sender
-    sender = TelegramSender(
-        token="YOUR_TELEGRAM_BOT_TOKEN",
-        batch_size=20,  # Send 20 messages concurrently
-        delay_between_batches=2.0,  # 2-second delay between batches
-        use_mongo=True,  # Log results in MongoDB
-        parse_mode="HTML"  # Using HTML as parse_mode
-    )
-
-    # Prepare the data
-    text = "Check out this <b>beautiful</b> photo!"
-    media_items = [
-        Photo("PHOTO_FILE_ID")  # Single photo
-    ]
-    reply_markup = {
-        "inline_keyboard": [
-            [{"text": "Like", "callback_data": "like"},
-             {"text": "Dislike", "callback_data": "dislike"}]
-        ]
-    }
-
-    # List of chat IDs
-    chat_ids = [123456789, 987654321, 456123789]
-
-    # Start the message sending process
-    delivered, not_delivered = await sender.run(chat_ids, text=text, media_items=media_items, reply_markup=reply_markup)
-
-    # Output statistics
-    print(f"Successfully sent: {delivered}, Failed to send: {not_delivered}")
-
-# Run the asynchronous task
-asyncio.run(main())
-```
-
-### Example 3 - Sending Multiple Photos and Videos in Any Order
-
-This example demonstrates how to send multiple photos and videos in a single message using `sendMediaGroup`, preserving the order of media items.
-
-```python
-import asyncio
-from telegram_sender import TelegramSender, Photo, Video
-
-async def main():
-    # Initialize the message sender
-    sender = TelegramSender(
-        token="YOUR_TELEGRAM_BOT_TOKEN",
-        batch_size=2,  # Send 2 messages concurrently
-        delay_between_batches=1.5,  # 1.5-second delay between batches
-        use_mongo=False  # No MongoDB logging
-    )
-
-    # Prepare the data
-    text = "Here are some highlights from our latest event!"
-    media_items = [
-        Photo("PHOTO_FILE_ID_1"),
-        Video("VIDEO_FILE_ID_1"),
-        Photo("PHOTO_FILE_ID_2"),
-    ]
-
-    # Note: reply_markup is not supported with sendMediaGroup
-    reply_markup = None
-
-    # List of chat IDs
-    chat_ids = [123456789, 987654321, 456123789]
-
-    # Start the message sending process
-    delivered, not_delivered = await sender.run(chat_ids, text=text, media_items=media_items)
-
-    # Output statistics
-    print(f"Successfully sent: {delivered}, Failed to send: {not_delivered}")
-
-# Run the asynchronous task
-asyncio.run(main())
-```
-
-**Important Notes:**
-
-- When sending multiple media files using `sendMediaGroup`, the `reply_markup` parameter (e.g., inline keyboards) is **not supported** by the Telegram API. If you need to include buttons, consider sending them in a separate message after the media group.
-- The `media_items` list allows you to mix photos and videos in any order. Each item is an instance of `Photo` or `Video`.
-
-### Example 4 - Sending a Single Video with Text and Buttons
-
-This example shows how to send a single video with a caption and inline buttons.
-
-```python
-import asyncio
-from telegram_sender import TelegramSender, Video
-
-async def main():
-    # Initialize the message sender
-    sender = TelegramSender(
-        token="YOUR_TELEGRAM_BOT_TOKEN",
-        batch_size=10,  # Send 10 messages concurrently
-        delay_between_batches=1.0,  # 1-second delay between batches
-        use_mongo=False,  # No MongoDB logging
-        parse_mode="Markdown"  # Using Markdown as parse_mode
-    )
-
-    # Prepare the data
-    text = "*Watch* this exciting video!"
-    media_items = [
-        Video("VIDEO_FILE_ID")  # Single video
-    ]
-    reply_markup = {
-        "inline_keyboard": [
-            [{"text": "👍 Like", "callback_data": "like"},
-             {"text": "👎 Dislike", "callback_data": "dislike"}]
-        ]
-    }
-
-    # List of chat IDs
-    chat_ids = [123456789, 987654321, 456123789]
-
-    # Start the message sending process
-    delivered, not_delivered = await sender.run(chat_ids, text=text, media_items=media_items, reply_markup=reply_markup)
-
-    # Output statistics
-    print(f"Successfully sent: {delivered}, Failed to send: {not_delivered}")
-
-# Run the asynchronous task
-asyncio.run(main())
-```
-
-### Example 5 - Logging Messages in MongoDB
-
-This example demonstrates how to enable MongoDB logging to keep records of sent messages.
-
-```python
-import asyncio
-from telegram_sender import TelegramSender
-
-async def main():
-    # Initialize the message sender with MongoDB logging
-    sender = TelegramSender(
-        token="YOUR_TELEGRAM_BOT_TOKEN",
-        batch_size=10,  # Batch size of 10 messages
-        delay_between_batches=1.0,  # 1-second delay between batches
-        use_mongo=True,  # Enable MongoDB logging
-        mongo_uri="mongodb://localhost:27017",  # MongoDB URI
-        mongo_db="telegram_logs"  # Database name
-    )
-
-    # Message text
-    text = "This message will be logged in MongoDB."
-
-    # List of chat IDs
-    chat_ids = [123456789, 987654321, 456123789]
-
-    # Start the message sending process
-    delivered, not_delivered = await sender.run(chat_ids, text=text)
-
-    # Output statistics
-    print(f"Successfully sent: {delivered}, Failed to send: {not_delivered}")
-
-# Run the asynchronous task
-asyncio.run(main())
-```
-
-### Example 6 - Disabling Web Page Preview
-
-This example demonstrates how to disable link previews when sending a text message with `sendMessage`.
-
-```python
-import asyncio
-from telegram_sender import TelegramSender
-
-async def main():
-    # Initialize the message sender
-    sender = TelegramSender(
-        token="YOUR_TELEGRAM_BOT_TOKEN",
-        batch_size=30,  # Increased batch size to 30 messages concurrently
-        delay_between_batches=1.5,  # 1.5-second delay between batches
-        use_mongo=False,  # No MongoDB logging
-        parse_mode="Markdown"  # Setting parse_mode to Markdown
-    )
-
-    # Message text
-    text = "*Hello!* Here is a link: https://example.com"
-
-    # List of chat IDs
-    chat_ids = [123456789, 987654321, 456123789]
-
-    # Start the message sending process
     delivered, not_delivered = await sender.run(
-        chat_ids, 
-        text=text,
-        disable_web_page_preview=True  # Parameter to disable previews
+        [4600731, 4600732],
+        text="Hello from <b>MAX</b>.",
+        recipient_type="user",
     )
 
-    # Output statistics
-    print(f"Successfully sent: {delivered}, Failed to send: {not_delivered}")
+    print(f"Delivered: {delivered}, failed: {not_delivered}")
 
-# Run the asynchronous task
+
 asyncio.run(main())
 ```
 
-## Getting Started
-
-To start using **telegram_sender**, you need:
-
-- **Python 3.10+**: The codebase uses modern Python features and type annotations.
-- **Telegram Bot Token**: Obtain one by creating a bot through [BotFather](https://telegram.me/botfather) on Telegram.
-- **Install the Package**: Install **telegram_sender** using pip:
-
-  ```bash
-  pip install telegram_sender
-  ```
-
-- **MongoDB Instance (Optional)**: If you wish to enable logging, have access to a MongoDB database.
-
-## How to Obtain Media File IDs
-
-To reuse photos or videos in Telegram without re-uploading, you can obtain their `file_id` by sending the media as a message through your bot to any user (e.g., yourself or any user who has interacted with the bot).
-
-Here's a simple function to get a photo or video `file_id`:
+### Text plus inline keyboard
 
 ```python
-import requests
+import asyncio
 
-def get_media_token(bot_token: str, media_path: str, chat_id: int, media_type: str = "photo") -> str:
-    with open(media_path, "rb") as media_file:
-        response = requests.post(
-            url=f"https://api.telegram.org/bot{bot_token}/send{media_type.capitalize()}",
-            files={media_type: media_file},
-            data={"chat_id": chat_id}
-        )
-        response_data = response.json()
-        if not response_data.get("ok"):
-            raise Exception(f"Error sending media: {response_data}")
-        result = response_data["result"]
-        media_key = "photo" if media_type == "photo" else "video"
-        media = result[media_key]
-        if isinstance(media, list):
-            return media[-1]["file_id"]
-        else:
-            return media["file_id"]
+from max_sender import MaxSender
 
-# Example usage:
-# Replace "YOUR_TELEGRAM_BOT_TOKEN" with your bot token and use your own chat_id or any user who interacted with the bot.
-# photo_token = get_media_token("YOUR_TELEGRAM_BOT_TOKEN", "/path/to/photo.jpg", YOUR_CHAT_ID, media_type="photo")
-# video_token = get_media_token("YOUR_TELEGRAM_BOT_TOKEN", "/path/to/video.mp4", YOUR_CHAT_ID, media_type="video")
+
+async def main() -> None:
+    sender = MaxSender(token="YOUR_MAX_BOT_TOKEN", use_mongo=False)
+
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {"text": "Open docs", "url": "https://dev.max.ru/docs-api"},
+                {"text": "Ping", "callback_data": "ping"},
+            ]
+        ]
+    }
+
+    delivered, not_delivered = await sender.run(
+        [4600731],
+        text="Choose an action.",
+        reply_markup=reply_markup,
+        recipient_type="user",
+    )
+
+    print(f"Delivered: {delivered}, failed: {not_delivered}")
+
+
+asyncio.run(main())
 ```
+
+### Media broadcast with ready MAX tokens
+
+```python
+import asyncio
+
+from max_sender import MaxSender, Photo, Video
+
+
+async def main() -> None:
+    sender = MaxSender(token="YOUR_MAX_BOT_TOKEN", use_mongo=False)
+
+    delivered, not_delivered = await sender.run(
+        [4600731],
+        text="Media payload in original order.",
+        media_items=[
+            Photo("MAX_IMAGE_TOKEN"),
+            Video("MAX_VIDEO_TOKEN"),
+            Photo("MAX_IMAGE_TOKEN_2"),
+        ],
+        recipient_type="user",
+    )
+
+    print(f"Delivered: {delivered}, failed: {not_delivered}")
+
+
+asyncio.run(main())
+```
+
+## MongoDB logging
+
+When `use_mongo=True`, each attempt is stored in a collection named by the Moscow-time launch timestamp. Each document includes:
+
+- `recipient_id`
+- `recipient_type`
+- `attempt`
+- `delivered`
+- `http_status`
+- raw MAX response body
+- exception details, if any
+- compact payload summary
+
+## Notes
+
+- `parse_mode` supports only `HTML` and `Markdown`
+- `disable_web_page_preview` maps to MAX `disable_link_preview`
+- `Photo(...)` maps to MAX attachment type `image`
+- Delivery uses a conservative internal profile of up to 25 concurrent sends with at least 1.1 seconds between batch starts
+- Temporary delivery errors are retried via a shared queue, so `429` pauses the sender instead of immediately dropping later messages
+- Rate-limit retries use a stronger fallback cooldown than generic temporary errors because MAX often omits `Retry-After` on `429`
+- Local file upload is intentionally out of scope for v1; upload files separately through `POST /uploads` and reuse the returned tokens
+
+## MAX references
+
+- [MAX API overview](https://dev.max.ru/docs-api)
+- [Send message](https://dev.max.ru/docs-api/methods/POST/messages)
+- [Upload files](https://dev.max.ru/docs-api/methods/POST/uploads)
+- [Get updates](https://dev.max.ru/docs-api/methods/GET/updates)
