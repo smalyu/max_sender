@@ -12,9 +12,9 @@ jobs:
     name: Build Distributions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Set Up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
       - name: Build Release Distributions
@@ -24,7 +24,7 @@ jobs:
           python -m build
           twine check --strict dist/*
       - name: Upload Distributions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-dists
           path: dist/
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Distributions
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: release-dists
           path: dist/
