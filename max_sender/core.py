@@ -130,12 +130,8 @@ class MaxSender:
             )
         return normalized
 
-    def _prepare_query_params(
-        self, disable_web_page_preview: bool
-    ) -> dict[str, str]:
-        return {
-            "disable_link_preview": "true" if disable_web_page_preview else "false"
-        }
+    def _prepare_query_params(self, disable_web_page_preview: bool) -> dict[str, str]:
+        return {"disable_link_preview": "true" if disable_web_page_preview else "false"}
 
     def _prepare_message_payload(
         self,
@@ -280,9 +276,12 @@ class MaxSender:
 
     async def _send_message(self, request_data: dict[str, Any]) -> bool:
         normalized_request = self._normalize_request_data(request_data)
-        delivered, not_delivered, retry_queue, retry_delay = (
-            await self._process_batch_messages([normalized_request])
-        )
+        (
+            delivered,
+            not_delivered,
+            retry_queue,
+            retry_delay,
+        ) = await self._process_batch_messages([normalized_request])
         if retry_queue:
             retried_delivered, retried_not_delivered = await self._drain_retry_queue(
                 retry_queue, retry_delay
@@ -454,9 +453,12 @@ class MaxSender:
                     await asyncio.sleep(sleep_time)
 
                 batch_start_time = time.monotonic()
-                delivered, not_delivered, retry_batch, retry_batch_delay = (
-                    await self._process_batch_messages(batch)
-                )
+                (
+                    delivered,
+                    not_delivered,
+                    retry_batch,
+                    retry_batch_delay,
+                ) = await self._process_batch_messages(batch)
                 total_delivered += delivered
                 total_not_delivered += not_delivered
                 pending_requests.extend(retry_batch)
@@ -482,15 +484,19 @@ class MaxSender:
                 await asyncio.sleep(sleep_time)
 
             batch_start_time = time.monotonic()
-            delivered, not_delivered, retry_queue, retry_delay = (
-                await self._process_batch_messages(batch)
-            )
+            (
+                delivered,
+                not_delivered,
+                retry_queue,
+                retry_delay,
+            ) = await self._process_batch_messages(batch)
             total_delivered += delivered
             total_not_delivered += not_delivered
             if retry_queue:
-                retried_delivered, retried_not_delivered = await self._drain_retry_queue(
-                    retry_queue, retry_delay
-                )
+                (
+                    retried_delivered,
+                    retried_not_delivered,
+                ) = await self._drain_retry_queue(retry_queue, retry_delay)
                 total_delivered += retried_delivered
                 total_not_delivered += retried_not_delivered
 
@@ -635,7 +641,9 @@ class MaxSender:
         try:
             await self._mongo_collection.insert_one(document)
         except Exception:
-            logger.exception("Failed to write MongoDB log for recipient_id=%s", recipient_id)
+            logger.exception(
+                "Failed to write MongoDB log for recipient_id=%s", recipient_id
+            )
 
     def _build_payload_summary(
         self,

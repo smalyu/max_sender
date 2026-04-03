@@ -238,7 +238,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with patch(
+            "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep_mock:
             delivered = await self.sender._send_message(
                 {
                     "payload": {"text": "hello", "format": "html"},
@@ -259,7 +261,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with patch(
+            "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep_mock:
             delivered = await self.sender._send_message(
                 {
                     "payload": {"text": "hello", "format": "html"},
@@ -280,7 +284,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with patch(
+            "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep_mock:
             delivered = await self.sender._send_message(
                 {
                     "payload": {"text": "hello", "format": "html"},
@@ -307,7 +313,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with patch(
+            "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep_mock:
             delivered = await self.sender._send_message(
                 {
                     "payload": {
@@ -327,7 +335,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
             [FakeResponse(400, {"code": "bad.request", "message": "bad"})]
         )
 
-        with patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with patch(
+            "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep_mock:
             delivered = await self.sender._send_message(
                 {
                     "payload": {"text": "hello", "format": "html"},
@@ -357,7 +367,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
         sender._session = session
 
         with (
-            patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
+            patch(
+                "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+            ) as sleep_mock,
             patch.object(sender, "_get_batch_interval", return_value=0.0),
         ):
             delivered, not_delivered = await sender._send_messages(
@@ -386,7 +398,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch("max_sender.core.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with patch(
+            "max_sender.core.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep_mock:
             delivered = await self.sender._send_message(
                 {
                     "payload": {"text": "hello", "format": "html"},
@@ -406,7 +420,9 @@ class MaxSenderDeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_logs_successful_attempt_to_mongo(self):
         self.sender._use_mongo = True
         self.sender._mongo_collection = FakeCollection()
-        self.sender._session = FakeSession([FakeResponse(200, {"message": {"id": "6"}})])
+        self.sender._session = FakeSession(
+            [FakeResponse(200, {"message": {"id": "6"}})]
+        )
 
         delivered = await self.sender._send_message(
             {
