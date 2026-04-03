@@ -34,23 +34,14 @@ jobs:
     needs:
       - build
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    environment:
-      name: pypi
-      url: https://pypi.org/p/max-sender
     steps:
       - name: Download Distributions
         uses: actions/download-artifact@v5
         with:
           name: release-dists
           path: dist/
-      - name: Publish Package Distributions To PyPI Via API Token
-        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+      - name: Publish Package Distributions To PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
-      - name: Publish Package Distributions To PyPI Via Trusted Publisher
-        if: ${{ secrets.PYPI_API_TOKEN == '' }}
-        uses: pypa/gh-action-pypi-publish@release/v1
